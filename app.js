@@ -200,6 +200,18 @@ function extractUrl(text){
   return m ? m[0].replace(/[).,;]+$/,"") : null;
 }
 
+/* Only treat the input as "a link to fetch" when the WHOLE box is essentially just a URL.
+   A pasted job description that merely CONTAINS a url (apply links, signatures, etc.) is
+   treated as text and tailored directly — never fetched. */
+function looksLikeBareLink(text){
+  const t = text.trim();
+  if(!/^https?:\/\//i.test(t)) return false;     // must START with a link
+  if(/\s/.test(t.replace(/^https?:\/\/\S+/i,"").trim()) && t.length > 300) return false;
+  // after removing the leading URL, almost nothing should remain
+  const rest = t.replace(/^https?:\/\/\S+/i,"").trim();
+  return rest.length < 80;
+}
+
 function htmlToText(html){
   const doc = new DOMParser().parseFromString(html, "text/html");
   doc.querySelectorAll("script,style,noscript,svg,iframe,nav,footer,header,form").forEach(n=>n.remove());
@@ -251,9 +263,10 @@ async function run(){
   if(!adText && adImages.length===0){ showErr("Add the job ad first — paste the link, the text, or scan it."); return; }
   $("goBtn").disabled = true;
 
-  // link mode: user pasted a URL (with little or no other text) — fetch the posting for them
+  // link mode ONLY when the entire box is basically just a URL — a pasted description
+  // that contains a link is treated as text and tailored directly.
   const url = extractUrl(adText);
-  const linkMode = url && adText.replace(url,"").trim().length < 200 && adImages.length===0;
+  const linkMode = adImages.length===0 && looksLikeBareLink(adText);
   let needWebSearch = false;
 
   startStatus(linkMode ? "fetching posting from link" : null);
